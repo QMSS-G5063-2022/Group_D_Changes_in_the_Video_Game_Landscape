@@ -1,0 +1,46 @@
+---
+title: "project_proposal"
+author: "Tobias"
+date: "3/1/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Title: Shifts in the Gaming Industry
+
+1. Team Members: 
+  + Shengkang (Tobias) Zhou
+  + Tasnuva (Tazz) Orchi 
+  + Xiuyuan (Alan) Shen 
+  + Adrian Varallyay 
+  
+2. Abstract:
+
+  We are interested in exploring the evolution of the gaming industry, especially as a result of significant social change. The gaming industry can often reflect major shifts experienced by the general public or demonstrate important technological advancements. In order to assess these changes we are analyzing the following aspects of the industry:
+  * Hardware Sales: How has hardware sales evolved over time? Are spikes in sales correlated with particular events, for instance, have console sales increased as a result of Covid-19 and more time spent at home?
+  * Phenomenal games: Sometimes we see a phenomenal game appear in the field (Skyrim in 2011, for example). Does it benefit from a popular trend, such as a movie? Does it lead to a boom in similar genres?
+  * COVID-19 Effect: How has the COVID-19 pandemic affected the video game industry? How are game companies shifting their business models to allow for growth? How has consumer behavior changed, in terms of types of games being played, consoles being purchased, growth in gaming community networks, etc.? How has playing video games affected well being (during pandemic)?
+  
+3. Data Description:
+  + RAWG Video Games Database API: RAWG is the largest video game database and game discovery service, having 500,000+ games in its database. The games it contains includes ones released in the 60s, and also the most up-to-date. We wrote a API client in python to extract the following information about games in interest:
+    *  Name of the game
+    *  Release date
+    *  Platform: PC/Xbox/Nintendo/Mobile…
+    *  Overall rating: from 0-5
+    *  Recommend status: Recommended/Exceptional/Meh/Skip
+    *  Metacritic score: 0-100
+    *  Suggestion_count: how many people suggested the game
+    *  Tags: singleplayer, multiplayer, strategy, RPG, FPS….
+  + [Data](https://www.researchgate.net/publication/351372985_Playing_Video_Games_During_the_COVID-19_Pandemic_and_Effects_on_Players%27_Well-Being) collected by Professor Matthew Barr at Glasgow University. Online survey was distributed via the first author’s social networks (Twitter and Facebook) and posted to gaming-related groups on Reddit. The purpose of the study was ‘to explore how people have been playing video games during coronavirus (COVID-19) lockdown, and particularly if playing games has had any effect on players’ well-being’. The survey ran from June 23, 2020 to July 3, 2020. We reached out to Professor Barr and were given access to his data; the portions of free text responses were not shared due to concerns of violating confidentiality.
+  
+4. Visualization:
+  + Interactive Line Chart: For different hardware (consoles and perhaps pc parts), this graph will show the change in sales over time. This graph should show periods of time where there were obvious spikes and dips in sales. 
+  + Blob chart for genre popularity: We can look at some of the phenomenal games in history, and see whether it led to a boom in that genre in the following years by creating a blob chart showing the number of the genre. 
+  + Static ggplot displaying effect of gaming on well being
+  + Interactive time series plot (potentially heatmap) that shows change in popularity of different game genres over time, or the change in amount of time spent playing games during a specific period of time such as during the pandemic
+  + Network Graph: This will show how popular games and characteristics are related, for instance, we can show games that fall into the “multiplayer” category as well as the “Open-world” category. 
+
+
