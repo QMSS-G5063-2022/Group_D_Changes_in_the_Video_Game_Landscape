@@ -1,0 +1,317 @@
+---
+title: "Covid Gaming"
+author: "Adrian Varallyay av2734"
+date: '2022-03-11'
+always_allow_html: yes
+output:
+  html_document:
+    keep_md: yes
+  pdf_document: default
+font-family: Helvetica
+autosize: yes
+---
+
+```{r setup, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# set up and libraries
+library(knitr)
+library(readxl)
+library(magrittr)
+library(tidyverse)
+library(ggplot2)
+library(ggthemes)
+
+
+
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# read in covid gaming
+covid <- read_excel("data/covid-19-results-redacted.xlsx")
+```
+
+
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# edit df and create factors/levels
+covid$`age group` <- factor(covid$`age group` ,
+                            levels = c("16-24","25-34","35-44","45-54","55-64","60+"),
+                            labels = c("16-24","25-34","35-44","45-54","55-64","60+"),
+                            ordered = TRUE)
+
+covid$`age group` <- paste(covid$`age group`,"year olds")
+
+covid$gender <- factor(covid$gender,
+                       levels = c("Male","Female","Non-binary","Genderqueer","Woman","Prefer not to say"),
+                       labels = c("Male","Female","Non-binary","Genderqueer","Woman","Prefer not to say"),
+                       ordered = TRUE)
+
+
+covid$`occupation group` <- factor(covid$`occupation group`,
+                                   levels = c("not currently employed","Student","part-time","full-time","Self-employed"),
+                                   labels = c("not currently employed","Student","part-time","full-time","Self-employed"),
+                                   ordered = TRUE)
+                                           
+
+covid$degree <- factor(covid$degree,
+                         levels = c("Vocational qualification", "High school/secondary school", "University graduate", "Postgraduate qualification"),
+                         labels = c("Vocational qualification", "High school/secondary school", "University graduate",
+                                    "Postgraduate qualification"),ordered = TRUE)
+
+
+covid$`gaming frequency` <- factor(covid$`gaming frequency`,
+                                     levels = c("Rarely", "Once a month", "Several times a month", "Once a week", 
+                                                "Several times a week", "At least once a day", "Several times a day"),
+                                     labels = c("Rarely", "Once a month", "Several times a month", "Once a week",
+                                                "Several times a week", "At least once a day", "Several times a day"), ordered = TRUE)
+
+covid$`change in frequency` <- as.factor(covid$`change in frequency`)
+
+
+covid$`covid gaming frequency` <- factor(covid$`covid gaming frequency`,
+                                           levels = c("Rarely", "Once a month", "Several times a month", "Once a week",
+                                                      "Several times a week", "At least once a day", "Several times a day"),
+                                           labels = c("Rarely", "Once a month", "Several times a month", "Once a week",
+                                                      "Several times a week", "At least once a day", "Several times a day"), ordered = TRUE)
+
+
+
+covid$`change in game type` <- factor(covid$`change in game type`,
+                                           levels = c("Not sure", "No", "Yes"),
+                                           labels = c("Not sure", "No", "Yes"), ordered = TRUE)
+
+
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# randomly assign pos/neg (1,0) membership to those who responded yes
+n = 456
+neg <- (n/11) #<< 41.45455
+pos <- neg *10 #<< 414.5455
+prcnt_pos <- pos/n#, digits = 2) #<< 0.9090909 round(
+prcnt_neg <- 1 - prcnt_pos #<< 0.09090909
+
+posi = sample(c(rep(1, 91/100 * n),
+                        rep(0, 9/100 * n))) %>%
+  c(0)
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# filter yes responses
+cov_yes <- covid %>%
+  filter(`well-being impact` == "Yes") %>%
+  mutate(
+    positive = posi
+  ) 
+
+# create impact type variable for visualization
+cov_yes$`impact type` <- ifelse(cov_yes$positive == 1, "Positive Impact", "Negative Impact")
+
+# set percentage  of each respondent
+cov_yes$participant_pctge <- 0.002192982
+
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+covid.df <- cov_yes
+
+# get percentages for var groupings
+imppct <- covid.df %>%
+  group_by(`impact type`) %>% 
+  summarize(pct_imp = sum(participant_pctge))
+
+new <- left_join(covid.df, imppct, by = c("impact type" = "impact type"), keep = FALSE)
+
+agepct <- covid.df %>%
+  group_by(`impact type`, `age group`) %>%
+  summarize(pct_age = sum(participant_pctge))
+
+new <- left_join(new, agepct, by = c("impact type" = "impact type",
+                                     "age group" = "age group"), keep = FALSE)
+
+sexpct <- covid.df %>% 
+  group_by(`impact type`, gender) %>%
+  summarize(pct_sex = sum(participant_pctge))
+
+
+
+new <- left_join(new, sexpct, by = c("impact type" = "impact type",
+                                     "gender" = "gender"), keep = FALSE)
+
+occpct <- covid.df %>% 
+  group_by(`impact type`, `occupation group`) %>%
+  summarize(pct_occ = sum(participant_pctge))
+
+new <- left_join(new, occpct, by = c("impact type" = "impact type",
+                                     "occupation group" = "occupation group"), keep = FALSE)
+
+degpct <- covid.df %>% 
+  group_by(`impact type`, degree) %>%
+  summarize(pct_deg = sum(participant_pctge))
+
+new <- left_join(new, degpct, by = c("impact type" = "impact type",
+                                     "degree" = "degree"), keep = FALSE)
+
+cgfpct <- covid.df %>% 
+  group_by(`impact type`, `covid gaming frequency`) %>%
+  summarize(pct_cgf = sum(participant_pctge))
+
+new <- left_join(new, cgfpct, by = c("impact type" = "impact type",
+                                     "covid gaming frequency" = "covid gaming frequency"), keep = FALSE)
+
+cgtpct <- covid.df %>% 
+  group_by(`impact type`, `change in game type`) %>%
+  summarize(pct_cgt = sum(participant_pctge))
+
+new <- left_join(new, cgtpct, by = c("impact type" = "impact type",
+                                     "change in game type" = "change in game type"), keep = FALSE)
+
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# get no responses and merge
+cneg <- covid %>% 
+  filter(`well-being impact` == "No")
+  
+cneg$`impact type` <- "No Impact"
+cneg$positive <- NA
+cneg$participant_pctge <- NA
+cneg$pct_imp <- NA
+cneg$pct_age <- NA
+cneg$pct_sex <- NA
+cneg$pct_occ <- NA
+cneg$pct_deg <- NA
+cneg$pct_cgf <- NA
+cneg$pct_cgt <- NA
+
+new.y.n <- rbind(new, cneg)
+
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# set ggplot bases
+wb_imp <- ggplot(new.y.n,
+              aes(x = `well-being impact`))
+
+age <- ggplot(new, 
+              aes(x = `age group`))
+           
+gend <- ggplot(new, 
+               aes(x = gender))
+
+# avoid NA in plot
+new.oc <- filter(new, `occupation group` == "not currently employed" |
+                   `occupation group` == "part-time" |
+                   `occupation group` == "full-time" | 
+                   `occupation group` == "Self-employed" | 
+                   `occupation group` == "Student"  )
+
+occu <- ggplot(new.oc, 
+               aes(x = `occupation group`))
+
+
+
+deg <- ggplot(new,
+              aes(x = degree))
+
+impact <- ggplot(new,
+                    aes(x = `impact type`))
+
+# avoid NA in plot                    
+new.gm <- filter(new, `covid gaming frequency` == "Rarely" | `covid gaming frequency` == "Once a month" | 
+                   `covid gaming frequency` == "Several times a month" | `covid gaming frequency` == "Once a week" |
+                   `covid gaming frequency` ==  "Several times a week" | `covid gaming frequency` ==  "At least once a day" | 
+                   `covid gaming frequency` ==  "Several times a day")
+
+gm_freq <- ggplot(new.gm,
+                  aes(x = `covid gaming frequency`))
+
+gm_type <- ggplot(new.gm,
+                  aes(x = `change in game type`))
+
+```
+
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+wb_imp + geom_density(aes(fill = `impact type`), alpha = 0.4) +
+  coord_flip() +
+  facet_wrap(~`well-being impact`) +
+  theme_tufte() +
+  labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", subtitle = 'by Well-being Impact Type') +
+  ylab("") +
+  theme(axis.text.y=element_blank(), axis.ticks.y=element_blank())
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+age + geom_density(aes(fill = `impact type`), alpha = 0.4) +
+  coord_flip() +
+  facet_wrap(~`age group`) +
+  theme_tufte() +
+  labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", subtitle = 'by Age Group') +
+  theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank()) 
+
+
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+
+gend + geom_density(aes(fill = `impact type`), alpha = 0.4) +
+  coord_flip() +
+  facet_wrap(~gender) +
+  theme_tufte() +
+  labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", subtitle = 'by Gender') +
+  theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank(), panel.spacing = unit(1, "lines")) 
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE} 
+occu + geom_density(aes(fill = `impact type`), alpha = 0.4) +
+  coord_flip() +
+  facet_wrap(~`occupation group`) +
+  theme_tufte() +
+  labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", subtitle = 'by Occpation Status') +
+  theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank(), panel.spacing = unit(1, "lines")) 
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+deg + geom_density(aes(fill = `impact type`), alpha = 0.4) +
+  coord_flip() +
+  facet_wrap(~degree) +
+  theme_tufte() +
+  labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", subtitle = 'by Academic Degree') +
+  theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank()) 
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+gm_freq + geom_density(aes(fill = `impact type`), alpha = 0.4) +
+  coord_flip() +
+  facet_wrap(~`covid gaming frequency`) +
+  theme_tufte() +
+  labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", subtitle = 'by Gaming Frequency During Pandemic') +
+  theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank())
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+gm_type + geom_density(aes(fill = `impact type`), alpha = 0.4) +
+  coord_flip() +
+  facet_wrap(~`change in game type`) +
+  theme_tufte() +
+  labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", subtitle = 'by Change in Game Type Played During Pandemic') +
+  theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank())
+```
+
+
+
+
