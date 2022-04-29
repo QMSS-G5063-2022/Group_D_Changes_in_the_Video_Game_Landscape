@@ -1,0 +1,513 @@
+---
+title: "viz_shiny_tobias"
+author: "Tobias"
+date: "4/23/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(pacman)
+p_load(rio, tidyverse, magrittr, readxl, ggplot2,ggthemes, plotly, shiny, stringr,dplyr,patchwork)
+```
+
+## loading df
+```{r}
+platform_by_year<- import("data/platform_by_year.csv")
+platform_by_year_sub<- import("data/platform_by_year_subset.csv")
+top_5_genre_rating<- import("data/top_5_genre.csv")
+top_5_genre_meta<- import("data/top_5_genre_meta.csv")
+gamesall<-import("data/gamesall.csv")
+```
+
+```{r}
+'%!in%' <- function(x,y)!('%in%'(x,y))
+genrelistg <- str_split(string = gamesall$new_tags, pattern = "', '")
+genrelist2g <- c(unique(genrelistg))
+all_geng<-c()
+for (i in genrelist2g){
+  for (j in i){
+    if (j %!in% all_geng){
+      all_geng<- c(all_geng, j)
+    }
+  }
+}
+all_geng<-c("",all_geng)
+# creating genre choice
+
+platlist <- str_split(string = gamesall$new_plat, pattern = "', '")
+platlist2 <- c(unique(platlist))
+all_plat<-c()
+for (i in platlist2){
+  for (j in i){
+    if (j %!in% all_plat){
+      all_plat<- c(all_plat, j)
+    }
+  }
+} 
+# creating platform choice
+
+gamesall$genre <- genrelistg
+gamesall$plat_list <- platlist
+gamesall$year <- as.numeric(gamesall$year)
+```
+
+
+```{r}
+# read in covid gaming
+covid <- read_excel("data/covid-19-results-redacted.xlsx")
+```
+
+
+```{r}
+# edit df and create factors/levels
+covid$`age group` <- factor(covid$`age group` ,
+                            levels = c("16-24","25-34","35-44","45-54","55-64","60+"),
+                            labels = c("16-24","25-34","35-44","45-54","55-64","60+"),
+                            ordered = TRUE)
+
+covid$`age group` <- paste(covid$`age group`,"year olds")
+
+covid$gender <- factor(covid$gender,
+                       levels = c("Male","Female","Non-binary","Genderqueer","Woman","Prefer not to say"),
+                       labels = c("Male","Female","Non-binary","Genderqueer","Woman","Prefer not to say"),
+                       ordered = TRUE)
+
+
+covid$`occupation group` <- factor(covid$`occupation group`,
+                                   levels = c("not currently employed","Student",
+                                              "part-time","full-time","Self-employed"),
+                                   labels = c("not currently employed","Student",
+                                              "part-time","full-time","Self-employed"),
+                                   ordered = TRUE)
+                                           
+
+covid$degree <- factor(covid$degree,
+                         levels = c("Vocational qualification", "High school/secondary school",
+                                    "University graduate", "Postgraduate qualification"),
+                         labels = c("Vocational qualification", "High school/secondary school",
+                                    "University graduate",
+                                    "Postgraduate qualification"),ordered = TRUE)
+
+
+covid$`gaming frequency` <- factor(covid$`gaming frequency`,
+                                     levels = c("Rarely", "Once a month", "Several times a month", 
+                                                "Once a week", "Several times a week", 
+                                                "At least once a day", "Several times a day"),
+                                     labels = c("Rarely", "Once a month", "Several times a month", 
+                                                "Once a week","Several times a week", 
+                                                "At least once a day", "Several times a day"), ordered = TRUE)
+
+covid$`change in frequency` <- as.factor(covid$`change in frequency`)
+
+
+covid$`covid gaming frequency` <- factor(covid$`covid gaming frequency`,
+                                           levels = c("Rarely", "Once a month", "Several times a month", 
+                                                      "Once a week","Several times a week",
+                                                      "At least once a day", "Several times a day"),
+                                           labels = c("Rarely", "Once a month", "Several times a month", 
+                                                      "Once a week","Several times a week",
+                                                      "At least once a day", "Several times a day"), 
+                                         ordered = TRUE)
+
+
+covid$`change in game type` <- factor(covid$`change in game type`,
+                                           levels = c("Not sure", "No", "Yes"),
+                                           labels = c("Not sure", "No", "Yes"), ordered = TRUE)
+```
+
+
+```{r}
+# randomly assign pos/neg (1,0) membership to those who responded yes
+n = 456
+neg <- (n/11) #<< 41.45455
+pos <- neg *10 #<< 414.5455
+prcnt_pos <- pos/n#, digits = 2) #<< 0.9090909 round(
+prcnt_neg <- 1 - prcnt_pos #<< 0.09090909
+
+posi = sample(c(rep(1, 91/100 * n),
+                        rep(0, 9/100 * n))) %>%
+  c(0)
+```
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# filter yes responses
+cov_yes <- covid %>%
+  filter(`well-being impact` == "Yes") %>%
+  mutate(
+    positive = posi
+  ) 
+
+# create impact type variable for visualization
+cov_yes$`Impact Type` <- ifelse(cov_yes$positive == 1, "Positive Impact", "Negative Impact")
+
+# set percentage  of each respondent
+cov_yes$participant_pctge <- 0.002192982
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+covid.df <- cov_yes
+
+# get percentages for var groupings
+imppct <- covid.df %>%
+  group_by(`Impact Type`) %>% 
+  summarize(pct_imp = sum(participant_pctge))
+
+new <- left_join(covid.df, imppct, by = c("Impact Type" = "Impact Type"), keep = FALSE)
+
+agepct <- covid.df %>%
+  group_by(`Impact Type`, `age group`) %>%
+  summarize(pct_age = sum(participant_pctge))
+
+new <- left_join(new, agepct, by = c("Impact Type" = "Impact Type",
+                                     "age group" = "age group"), keep = FALSE)
+
+sexpct <- covid.df %>% 
+  group_by(`Impact Type`, gender) %>%
+  summarize(pct_sex = sum(participant_pctge))
+
+
+
+new <- left_join(new, sexpct, by = c("Impact Type" = "Impact Type",
+                                     "gender" = "gender"), keep = FALSE)
+
+occpct <- covid.df %>% 
+  group_by(`Impact Type`, `occupation group`) %>%
+  summarize(pct_occ = sum(participant_pctge))
+
+new <- left_join(new, occpct, by = c("Impact Type" = "Impact Type",
+                                     "occupation group" = "occupation group"), keep = FALSE)
+
+degpct <- covid.df %>% 
+  group_by(`Impact Type`, degree) %>%
+  summarize(pct_deg = sum(participant_pctge))
+
+new <- left_join(new, degpct, by = c("Impact Type" = "Impact Type",
+                                     "degree" = "degree"), keep = FALSE)
+
+cgfpct <- covid.df %>% 
+  group_by(`Impact Type`, `covid gaming frequency`) %>%
+  summarize(pct_cgf = sum(participant_pctge))
+
+new <- left_join(new, cgfpct, by = c("Impact Type" = "Impact Type",
+                                     "covid gaming frequency" = "covid gaming frequency"), keep = FALSE)
+
+cgtpct <- covid.df %>% 
+  group_by(`Impact Type`, `change in game type`) %>%
+  summarize(pct_cgt = sum(participant_pctge))
+
+new <- left_join(new, cgtpct, by = c("Impact Type" = "Impact Type",
+                                     "change in game type" = "change in game type"), keep = FALSE)
+```
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# get no responses and merge
+cneg <- covid %>% 
+  filter(`well-being impact` == "No")
+  
+cneg$`Impact Type` <- "No Impact"
+cneg$positive <- NA
+cneg$participant_pctge <- NA
+cneg$pct_imp <- NA
+cneg$pct_age <- NA
+cneg$pct_sex <- NA
+cneg$pct_occ <- NA
+cneg$pct_deg <- NA
+cneg$pct_cgf <- NA
+cneg$pct_cgt <- NA
+
+new.y.n <- rbind(new, cneg)
+
+```
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# set ggplot bases
+wb_imp <- ggplot(new.y.n,
+              aes(x = `well-being impact`))
+
+age <- ggplot(new, 
+              aes(x = `age group`))
+           
+gend <- ggplot(new, 
+               aes(x = gender))
+
+# avoid NA in plot
+new.oc <- filter(new, `occupation group` == "not currently employed" |
+                   `occupation group` == "part-time" |
+                   `occupation group` == "full-time" | 
+                   `occupation group` == "Self-employed" | 
+                   `occupation group` == "Student"  )
+
+occu <- ggplot(new.oc, 
+               aes(x = `occupation group`))
+
+
+
+deg <- ggplot(new,
+              aes(x = degree))
+
+impact <- ggplot(new,
+                    aes(x = `Impact Type`))
+
+# avoid NA in plot                    
+new.gm <- filter(new, `covid gaming frequency` == "Rarely" | `covid gaming frequency` == "Once a month" | 
+                   `covid gaming frequency` == "Several times a month" | `covid gaming frequency` == "Once a week" |
+                   `covid gaming frequency` ==  "Several times a week" | `covid gaming frequency` ==  "At least once a day" | 
+                   `covid gaming frequency` ==  "Several times a day")
+
+gm_freq <- ggplot(new.gm,
+                  aes(x = `covid gaming frequency`))
+
+gm_type <- ggplot(new.gm,
+                  aes(x = `change in game type`))
+```
+```{r}
+mh_cat <-c("","well being","age group","gender","occupation", "degree",
+           "frequency","type")
+```
+## shibny app
+```{r}
+ui <- fluidPage(
+  
+  
+  sidebarPanel(
+    # genre1
+     selectizeInput(
+      inputId="genre1",
+      label="search for a genre",
+      multiple=F,
+      selected="rpg",
+      choice=all_geng,
+      options=list(
+        create=F,
+        placeholder="try rpg...",
+        maxItems="1",
+         onDropdownOpen = I("function($dropdown) {if (!this.lastQuery.length) {this.close(); this.settings.openOnFocus = false;}}"),
+        onType = I("function (str) {if (str === \"\") {this.close();}}")
+      )
+    ),
+    
+  # gene2
+     selectizeInput(
+      inputId="genre2",
+      label="search for another genre",
+      multiple=F,
+      choice=all_geng,
+      selected="all",
+      options=list(
+        create=F,
+        placeholder="try moba...",
+        maxItems="1",
+         onDropdownOpen = I("function($dropdown) {if (!this.lastQuery.length) {this.close(); this.settings.openOnFocus = false;}}"),
+        onType = I("function (str) {if (str === \"\") {this.close();}}")
+      )
+    ),
+  
+   # platform
+     selectizeInput(
+      inputId="platf",
+      label="search for a platform",
+      multiple=T,
+      choice=all_plat,
+      selected="PC",
+      options=list(
+        create=F,
+        placeholder="try PC...",
+        maxItems="1",
+         onDropdownOpen = I("function($dropdown) {if (!this.lastQuery.length) {this.close(); this.settings.openOnFocus = false;}}"),
+        onType = I("function (str) {if (str === \"\") {this.close();}}")
+      )
+    ),
+  
+  #mental health
+   selectizeInput(
+    inputId="mh",
+    label="search for a population category",
+    multiple=T,
+    choice=mh_cat,
+    selected="age group",
+    options=list(
+      create=F,
+      placeholder="search for a category",
+      maxItems="1",
+       onDropdownOpen = I("function($dropdown) {if (!this.lastQuery.length) {this.close(); this.settings.openOnFocus = false;}}"),
+      onType = I("function (str) {if (str === \"\") {this.close();}}")
+    )
+  ),
+  ),
+  
+  mainPanel(
+    plotlyOutput("games_rating"),
+    plotlyOutput("games_meta"),
+    DT::dataTableOutput("game_dt"),
+    plotlyOutput("t5_genre_rating"),
+    plotlyOutput("t5_genrer_meta"),
+    plotlyOutput("platform"),
+    plotOutput("mho")
+
+  )
+  
+)
+
+server <- function(input, output){
+  
+  df <- reactive({
+    req(input$genre1, input$genre2, input$platf)
+    gamesall %>% 
+      filter(str_detect(genre, input$genre1)) %>%
+      filter(str_detect(genre, input$genre2)) %>%
+      filter(str_detect(plat_list, input$platf))
+  })
+  
+  mh_choice <- reactive({
+    req(input$mh)
+    input$mh
+  })
+  
+  # output1: shiny interactive plot: search genre and render games' player rating
+  output$games_rating<- renderPlotly({
+    g <- ggplot(data=df(), aes(x=year,y=overall_rating, game_name=game_name, released_date=released_date))+
+      geom_jitter( color="red",width=0.2,size=0.5)+
+      geom_boxplot(fill="red",alpha=0.2)+
+      coord_flip()+
+      ggtitle("Player rating")+
+      scale_y_continuous(breaks=seq(0.5,5,by=0.5))+
+      scale_x_continuous(breaks=seq(2011,2021,by=1))+
+      theme_tufte()
+    
+    ggplotly(g,tooltip = c("game_name","year","overall_rating","released_date"))
+  })
+    # output2: shiny interactive plot: search genre and render games' meta rating
+  output$games_meta<- renderPlotly({
+    p <- ggplot(data=df(), aes(x=year,y=metacritic, game_name=game_name, released_date=released_date))+
+      geom_jitter(color="blue",width=0.2,size=0.5)+
+      geom_boxplot(fill="blue",alpha=0.2)+
+      coord_flip()+
+      ggtitle("Metacratic rating")+
+      scale_y_continuous(breaks=seq(20,100,by=10))+
+      scale_x_continuous(breaks=seq(2011,2021,by=1))+
+      theme_tufte()
+    
+    ggplotly(p,tooltip = c("game_name","year","metacritic","released_date"))
+  })
+  
+  #output 3: datatable for all games
+  
+  output$game_dt<- DT::renderDataTable(
+    games_DT,
+    option=list(order=list(5,"desc"))
+  )
+  
+  # output 4: plotly interactive plot: genre popularity over the years by player rating
+  output$t5_genre_rating<-renderPlotly({
+    g1 <- ggplot(data=top_5_genre_rating,aes(x=year,y=rating,fill=genre,size=count,genre=genre,metacritic=metacritics))+
+  geom_point(alpha=0.3)+
+  theme(axis.text.x = element_text(angle=45))+
+  scale_x_continuous(breaks=seq(2011,2021,by=1))+
+  scale_y_continuous(breaks=seq(0,5,by=0.2))+
+  labs(fill="genre")+
+  ggtitle("Player rated Top 5 Genres")+
+      theme_tufte()
+
+
+  ggplotly(g1,tooltip = c("year","count","genre","metacritic","rating"))
+  })
+  
+  # output 5: plotly interactive plot: genre popularity over the years by meta rating
+ output$t5_genrer_meta<-renderPlotly({
+    g3 <- ggplot(data=top_5_genre_meta,aes(x=year,y=metacritics,fill=genre,size=count,genre=genre,rating=rating))+
+  geom_point(alpha=0.3)+
+  theme(axis.text.x = element_text(angle=45))+
+  scale_x_continuous(breaks=seq(2011,2021,by=1))+
+  scale_y_continuous(breaks=seq(68,80,by=1))+
+  labs(fill="genre")+
+  ggtitle("Metacritics rated Top 5 Genres")+
+      theme_tufte()
+
+ggplotly(g3,tooltip = c("year","count","genre","metacritics","rating"))
+  })
+ 
+ # output 6: plotly interactive: platform popularity over the year by game counts
+ output$platform<-renderPlotly({
+   g5 <- ggplot(data=platform_by_year,aes(x=year,y=count,color=platform))+
+  geom_line()+
+  theme(axis.text.x = element_text(angle=45))+
+  scale_x_continuous(breaks=seq(2011,2021,by=1))+
+  labs(fill="platform")+
+  ggtitle("Game counts by platform between 2011 to 2021")+
+     theme_tufte()
+
+ggplotly(g5,tooltip = c("year","count","platform"))
+ })
+ 
+ output$mho<-renderPlot({
+   if (mh_choice()=="well being"){
+   wb_imp + geom_density(aes(fill = `Impact Type`), alpha = 0.4) +
+     coord_flip() +
+     facet_wrap(~`well-being impact`) +
+     labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic",
+          subtitle = 'by Well-being Impact Type') +
+     ylab("") +
+     theme(axis.text.y=element_blank(), axis.ticks.y=element_blank()) +
+     theme_tufte()
+   }else if(mh_choice()=="age group"){
+     age + geom_density(aes(fill = `Impact Type`), alpha = 0.4) +
+     coord_flip() +
+     facet_wrap(~`age group`) +
+     theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank()) +
+     theme_tufte()
+   }else if(mh_choice()=="gender"){
+      gend + geom_density(aes(fill = `Impact Type`), alpha = 0.4) +
+     coord_flip() +
+     facet_wrap(~gender) +
+     labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", subtitle = 'by Gender') +
+     theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(),
+           axis.title.y=element_blank(), panel.spacing = unit(1, "lines")) +
+     theme_tufte()
+   }else if(mh_choice()=="occupation"){
+     occu + geom_density(aes(fill = `Impact Type`), alpha = 0.4) +
+     coord_flip() +
+     facet_wrap(~`occupation group`) +
+     labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", 
+          subtitle = 'by Occpation Status') +
+     theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), 
+           axis.title.y=element_blank(), panel.spacing = unit(1, "lines")) +
+     theme_tufte()
+   }else if(mh_choice()=="degree"){
+      deg + geom_density(aes(fill = `Impact Type`), alpha = 0.4) +
+     coord_flip() +
+     facet_wrap(~degree) +
+     labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", subtitle = 'by Academic Degree') +
+     theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank()) +
+     theme_tufte()
+   }else if(mh_choice()=="frequency"){
+     gm_freq + geom_density(aes(fill = `Impact Type`), alpha = 0.4) +
+     coord_flip() +
+     facet_wrap(~`covid gaming frequency`) +
+     labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic",
+          subtitle = 'by Gaming Frequency During Pandemic') +
+     theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank()) +
+     theme_tufte()
+   }else{
+     gm_type + geom_density(aes(fill = `Impact Type`), alpha = 0.4) +
+     coord_flip() +
+     facet_wrap(~`change in game type`) +
+     labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", 
+          subtitle = 'by Change in Game Type Played During Pandemic') +
+     theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank()) +
+     theme_tufte()
+   }
+   
+ })
+ 
+
+}
+
+shinyApp(ui=ui, server=server)
+```
+
+
