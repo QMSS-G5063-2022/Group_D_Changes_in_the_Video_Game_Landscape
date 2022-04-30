@@ -15,26 +15,25 @@ library(tidyverse)
 library(readxl)
 library(dplyr)
 
-sales <- read_excel("./Hardware sales.xlsx") 
+sales <- read_excel("./data/Hardware sales.xlsx") %>% select(c(Hardware,Region,Day,Year,Month,Sales)) %>% mutate(Sold = (Sales/1000))
 
-sales2 <- sales %>% select(c(Hardware,Region,Day,Year,Month,Sales)) %>% mutate(Sold = (Sales/1000))
-sales2$Date <- as.Date(with(sales2, paste(Year,Month,Day, sep="-")),"%Y-%m-%d")
+sales$Date <- as.Date(with(sales, paste(Year,Month,Day, sep="-")),"%Y-%m-%d")
 ```
 
 ```{r}
 #line graph 
 
-ggplot(sales2, aes(x = Date, y = Sold, color = Hardware)) + geom_line()
+ggplot(sales, aes(x = Date, y = Sold, color = Hardware)) + geom_line()
 ```
 
 ```{r}
 #stream graph (going to change colors)
 library(ggstream)
 
-ggplot(sales2, aes(x = Date, y = Sold, fill = Hardware)) + geom_stream()
+ggplot(sales, aes(x = Date, y = Sold, fill = Hardware)) + geom_stream()
 ```
 ```{r}
-ggplot(sales2, aes(x = Date, y = Sold, fill = Hardware)) + geom_stream(type = "ridge")
+ggplot(sales, aes(x = Date, y = Sold, fill = Hardware)) + geom_stream(type = "ridge")
 ```
 ```{r}
 #ggplot(sales2, aes(x = Date, y = Sold, size = Sold, color = Hardware)) + geom_point() + scale_x_log10() + theme_bw() + labs(title = 'Year: {frame_time}', x = )
@@ -43,8 +42,123 @@ ggplot(sales2, aes(x = Date, y = Sold, fill = Hardware)) + geom_stream(type = "r
 
 ```{r}
 #word comparison cloud
+library(tm)
 library(tidytext)
+library(quanteda)
+library(wordcloud)
 
-tweet1 <- read_csv("./data/2019_tweets_clean.csv")
+tweet1 <- read_csv("./data/2019_tweets_clean.csv") %>% rename(doc_id = id) %>% rename( raw = text) %>% rename(text = cleaned) 
+
+tweet1 <- tweet1[, c("doc_id", "text")]
+
+tweet2 <- read_csv("./data/2020_tweets_clean.csv") %>% rename(doc_id = id) %>% rename( raw = text) %>% rename(text = cleaned) 
+
+tweet1 <- tweet1[, c("doc_id", "text")]
+
+tweet3 <- read_csv("./data/2021_cleaned_tweets.csv") %>% rename(doc_id = id) %>% rename( raw = text) %>% rename(text = cleaned) 
+
+tweet1 <- tweet1[, c("doc_id", "text")]
+```
+
+```{r}
+tweet1_source <- DataframeSource(tweet1)
+tweet1_corpus <- VCorpus(tweet1_source)
+
+tweet1_corpus
+
+tweet2_source <- DataframeSource(tweet2)
+tweet2_corpus <- VCorpus(tweet2_source)
+
+tweet2_corpus
+
+tweet3_source <- DataframeSource(tweet3)
+tweet3_corpus <- VCorpus(tweet3_source)
+
+tweet3_corpus
+
+removeNumPunct <- function(x){gsub("[^[:alpha:][:space:]]*", "", x)}
+clean_corpus <- function(corpus){
+  corpus <- tm_map(corpus, removePunctuation)
+  corpus <- tm_map(corpus, content_transformer(tolower))
+  corpus <- tm_map(corpus, removeWords, c(stopwords("en")))
+  corpus <- tm_map(corpus, removeNumbers)
+  corpus <- tm_map(corpus, stripWhitespace)
+  return(corpus)
+}
+
+tweet1_clean <- clean_corpus(tweet1_corpus)
+
+tweet1_dtm <- DocumentTermMatrix(tweet1_clean)
+tweet1_m <- as.matrix(tweet1_dtm)
+
+tweet2_clean <- clean_corpus(tweet2_corpus)
+
+tweet2_dtm <- DocumentTermMatrix(tweet2_clean)
+tweet2_m <- as.matrix(tweet2_dtm)
+
+tweet3_clean <- clean_corpus(tweet3_corpus)
+
+tweet3_dtm <- DocumentTermMatrix(tweet3_clean)
+tweet3_m <- as.matrix(tweet3_dtm)
+```
+
+```{r}
+tweet1_tidy <- tidy(tweet1_dtm)
+head(tweet1_tidy)
+
+tweet1_idf <- tweet1_tidy %>% bind_tf_idf(term, document, count) %>%  arrange(desc(tf_idf))
+head(tweet1_idf)
+
+tweet2_tidy <- tidy(tweet2_dtm)
+head(tweet2_tidy)
+
+tweet2_idf <- tweet2_tidy %>% bind_tf_idf(term, document, count) %>%  arrange(desc(tf_idf))
+head(tweet2_idf)
+
+tweet3_tidy <- tidy(tweet3_dtm)
+head(tweet3_tidy)
+
+tweet3_idf <- tweet3_tidy %>% bind_tf_idf(term, document, count) %>%  arrange(desc(tf_idf))
+head(tweet3_idf)
+```
+
+```{r}
+term_frequency_DT <- tweet1_idf
+
+set.seed(2103)
+
+wordcloud(
+  term_frequency_DT$term,
+  term_frequency_DT$tf,
+  max.words = 100,
+  colors = brewer.pal(8, "Set2")
+)
+
+```
+
+```{r}
+term_frequency_DT2 <- tweet2_idf
+
+set.seed(2103)
+
+wordcloud(
+  term_frequency_DT2$term,
+  term_frequency_DT2$tf,
+  max.words = 100,
+  colors = brewer.pal(8, "Set2")
+)
+```
+
+```{r}
+term_frequency_DT3 <- tweet1_idf
+
+set.seed(2103)
+
+wordcloud(
+  term_frequency_DT3$term,
+  term_frequency_DT3$tf,
+  max.words = 100,
+  colors = brewer.pal(8, "Set2")
+)
 ```
 
