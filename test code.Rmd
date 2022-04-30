@@ -1,0 +1,50 @@
+---
+title: "Code Prep"
+author: "Tazz"
+date: "4/30/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(readxl)
+library(dplyr)
+
+sales <- read_excel("./Hardware sales.xlsx") 
+
+sales2 <- sales %>% select(c(Hardware,Region,Day,Year,Month,Sales)) %>% mutate(Sold = (Sales/1000))
+sales2$Date <- as.Date(with(sales2, paste(Year,Month,Day, sep="-")),"%Y-%m-%d")
+```
+
+```{r}
+#line graph 
+
+ggplot(sales2, aes(x = Date, y = Sold, color = Hardware)) + geom_line()
+```
+
+```{r}
+#stream graph (going to change colors)
+library(ggstream)
+
+ggplot(sales2, aes(x = Date, y = Sold, fill = Hardware)) + geom_stream()
+```
+```{r}
+ggplot(sales2, aes(x = Date, y = Sold, fill = Hardware)) + geom_stream(type = "ridge")
+```
+```{r}
+#ggplot(sales2, aes(x = Date, y = Sold, size = Sold, color = Hardware)) + geom_point() + scale_x_log10() + theme_bw() + labs(title = 'Year: {frame_time}', x = )
+```
+
+
+```{r}
+#word comparison cloud
+library(tidytext)
+
+tweet1 <- read_csv("./data/2019_tweets_clean.csv")
+```
+
