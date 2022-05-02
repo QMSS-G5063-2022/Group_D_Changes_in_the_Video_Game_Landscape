@@ -582,8 +582,11 @@ myplot2 <- ggplotly(myplot2, tooltip = "text")
 # plotly of hardware sales data
 
 salesplot <-
-  ggplot(sales, aes(x = Date, y = Sold, color = Hardware)) + geom_line() + geom_text(
-    aes(x = as.Date("2019-11-30","%Y-%m-%d"), y = 1920, label = "Peak NS sales")) + theme_tufte() + ggtitle("Console Sales from 2019-2022")
+  ggplot(sales, aes(x = Date, y = Sold, color = Hardware)) + geom_line() + geom_text(aes(
+    x = as.Date("2019-11-30", "%Y-%m-%d"),
+    y = 1920,
+    label = "Peak NS sales"
+  )) + theme_tufte() + ggtitle("Console Sales from 2019-2022")
 
 salesplot <- ggplotly(salesplot)
 ```
@@ -592,7 +595,8 @@ salesplot <- ggplotly(salesplot)
 #plotly of game company stocks
 
 stockplot <-
-  ggplot(data = stock, aes(x = Date, y = open, color = stock)) + geom_line() + theme_classic() + geom_vline(xintercept = as.numeric(as.Date("2020-03-27")), linetype =4) + ggtitle("Stock changes of top 10 Game companies from 2019-2022") + xlab("Date") + ylab("Price at Open")
+  ggplot(data = stock, aes(x = Date, y = open, color = stock)) + geom_line() + theme_classic() + geom_vline(xintercept = as.numeric(as.Date("2020-03-27")), linetype =
+                                                                                                              4) + ggtitle("Stock changes of top 10 Game companies from 2019-2022") + xlab("Date") + ylab("Price at Open")
 
 
 stockplot <- ggplotly(stockplot)
