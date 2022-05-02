@@ -52,6 +52,11 @@ country <- readxl::read_xlsx("Data/game delay.xlsx", sheet = 2)
 # read in hardware sales data
 sales <- read_excel("./data/Hardware sales.xlsx") %>% select(c(Hardware,Region,Day,Year,Month,Sales)) %>% mutate(Sold = (Sales/1000))
 sales$Date <- as.Date(with(sales, paste(Year,Month,Day, sep="-")),"%Y-%m-%d")
+
+# read in stock data 
+stock <- read.csv("./data/all_weekly_stocks.csv")
+
+stock$Date <- as.Date(with(stock, paste(timestamp, sep="-")),"%Y-%m-%d")
 ```
 
 ```{r}
@@ -569,6 +574,15 @@ salesplot <-
 salesplot <- ggplotly(salesplot)
 ```
 
+```{r}
+#plotly of game company stocks
+
+stockplot <-
+  ggplot(data = stock, aes(x = Date, y = open, color = stock)) + geom_line() + theme_classic() + geom_vline(xintercept = as.numeric(as.Date("2020-03-27")), linetype =4) + ggtitle("Stock changes of top 10 Game companies from 2019-2022") + xlab("Date") + ylab("Price at Open")
+
+
+stockplot <- ggplotly(stockplot)
+```
 
 ```{r}
 #leaflet boundary
@@ -748,6 +762,10 @@ ui <- tagList(
                             h4("Console Sales Over Time"),
                             h4("Verbatim text output"),
                             plotlyOutput("salesplot"),
+                            br(),
+                            h4("Game Company Stocks Over Time"),
+                            h4("Verbatim text output"),
+                            plotlyOutput("stockplot"),
                             br()
                             ),
                    
@@ -999,6 +1017,10 @@ server <- function(input, output){
  # output 11: sales data
  output$salesplot <- renderPlotly({
    salesplot
+   })
+ # output 12: stock data
+ output$stockplot <- renderPlotly({
+   stockplot
    })
  }
 

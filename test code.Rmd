@@ -170,3 +170,24 @@ wordcloud(
 )
 ```
 
+```{r}
+stock <- read.csv("./data/all_weekly_stocks.csv")
+
+stock$Date <- as.Date(with(stock, paste(timestamp, sep="-")),"%Y-%m-%d")
+```
+
+```{r}
+#line graph with plotly 
+
+stockplot <-
+  ggplot(data = stock, aes(x = Date, y = open, color = stock)) + geom_line() + theme_classic() + geom_vline(xintercept = as.numeric(as.Date("2020-03-27")), linetype =4) + ggtitle("Stock changes of top 10 Game companies from 2019-2022") + xlab("Date") + ylab("Price at Open")
+
+
+stockplot <- ggplotly(stockplot)
+
+stockplot
+
+#make colors match tobias' graph
+```
+```
+
