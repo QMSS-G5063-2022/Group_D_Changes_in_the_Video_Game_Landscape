@@ -14,6 +14,7 @@ library(ggplot2)
 library(tidyverse)
 library(readxl)
 library(dplyr)
+library(plotly)
 
 sales <- read_excel("./data/Hardware sales.xlsx") %>% select(c(Hardware,Region,Day,Year,Month,Sales)) %>% mutate(Sold = (Sales/1000))
 
@@ -21,12 +22,16 @@ sales$Date <- as.Date(with(sales, paste(Year,Month,Day, sep="-")),"%Y-%m-%d")
 ```
 
 ```{r}
-#line graph 
+#line graph with plotly 
 
-ggplot(sales, aes(x = Date, y = Sold, color = Hardware)) + geom_line()
+plot <-
+  ggplot(sales, aes(x = Date, y = Sold, color = Hardware)) + geom_line() + geom_text(
+    aes(x = as.Date("2019-10-05","%Y-%m-%d"), y = 3300, label = "Peak NS sales")) + theme_classic()
+
+ggplotly(plot)
 
 #slider for dates 
-#make colors 
+#make colors match tobias' graph
 ```
 
 ```{r}
