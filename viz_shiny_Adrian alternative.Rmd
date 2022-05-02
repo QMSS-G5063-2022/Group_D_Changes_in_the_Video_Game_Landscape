@@ -1,0 +1,740 @@
+---
+title: "viz_shiny_tobias"
+author: "Tobias"
+date: "4/23/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# load packages
+library(pacman)
+p_load(rio,
+       rvest,
+       tidyverse, 
+       magrittr, 
+       readxl, 
+       ggplot2,
+       ggthemes, 
+       leaflet, 
+       plotly, 
+       shiny,
+       shinythemes,
+       colorspace,
+       stringr,
+       patchwork,
+       scales, install = TRUE)
+```
+
+
+```{r}
+# read in ratings and genre and games data
+platform_by_year<- import("data/platform_by_year.csv")
+platform_by_year_sub<- import("data/platform_by_year_subset.csv")
+top_5_genre_rating<- import("data/top_5_genre.csv")
+top_5_genre_meta<- import("data/top_5_genre_meta.csv")
+gamesall<-import("data/gamesall.csv")
+
+# read in covid mh gaming data
+covid <- read_excel("data/covid-19-results-redacted.xlsx")
+
+# read in game delay and country revenue data
+delay <- readxl::read_xlsx("Data/game delay.xlsx", sheet = 1)
+country <- readxl::read_xlsx("Data/game delay.xlsx", sheet = 2)
+```
+
+```{r}
+# creating genre choice
+'%!in%' <- function(x,y)!('%in%'(x,y))
+genrelistg <- str_split(string = gamesall$new_tags, pattern = "', '")
+genrelist2g <- c(unique(genrelistg))
+all_geng<-c()
+for (i in genrelist2g){
+  for (j in i){
+    if (j %!in% all_geng){
+      all_geng<- c(all_geng, j)
+    }
+  }
+}
+all_geng<-c("",all_geng)
+
+# creating platform choice
+platlist <- str_split(string = gamesall$new_plat, pattern = "', '")
+platlist2 <- c(unique(platlist))
+all_plat<-c()
+for (i in platlist2){
+  for (j in i){
+    if (j %!in% all_plat){
+      all_plat<- c(all_plat, j)
+    }
+  }
+} 
+
+# update games df
+gamesall$genre <- genrelistg
+gamesall$plat_list <- platlist
+gamesall$year <- as.numeric(gamesall$year)
+
+```
+
+
+
+```{r}
+# edit covid MH df and create factors/levels
+covid$`age group` <- factor(covid$`age group` ,
+                            levels = c("16-24","25-34","35-44","45-54","55-64","60+"),
+                            labels = c("16-24","25-34","35-44","45-54","55-64","60+"),
+                            ordered = TRUE)
+
+covid$`age group` <- paste(covid$`age group`,"year olds")
+
+covid$gender <- factor(covid$gender,
+                       levels = c("Male","Female","Non-binary","Genderqueer","Woman","Prefer not to say"),
+                       labels = c("Male","Female","Non-binary","Genderqueer","Woman","Prefer not to say"),
+                       ordered = TRUE)
+
+
+covid$`occupation group` <- factor(covid$`occupation group`,
+                                   levels = c("not currently employed","Student",
+                                              "part-time","full-time","Self-employed"),
+                                   labels = c("not currently employed","Student",
+                                              "part-time","full-time","Self-employed"),
+                                   ordered = TRUE)
+                                           
+
+covid$degree <- factor(covid$degree,
+                         levels = c("Vocational qualification", "High school/secondary school",
+                                    "University graduate", "Postgraduate qualification"),
+                         labels = c("Vocational qualification", "High school/secondary school",
+                                    "University graduate",
+                                    "Postgraduate qualification"),ordered = TRUE)
+
+
+covid$`gaming frequency` <- factor(covid$`gaming frequency`,
+                                     levels = c("Rarely", "Once a month", "Several times a month", 
+                                                "Once a week", "Several times a week", 
+                                                "At least once a day", "Several times a day"),
+                                     labels = c("Rarely", "Once a month", "Several times a month", 
+                                                "Once a week","Several times a week", 
+                                                "At least once a day", "Several times a day"), ordered = TRUE)
+
+covid$`change in frequency` <- as.factor(covid$`change in frequency`)
+
+
+covid$`covid gaming frequency` <- factor(covid$`covid gaming frequency`,
+                                           levels = c("Rarely", "Once a month", "Several times a month", 
+                                                      "Once a week","Several times a week",
+                                                      "At least once a day", "Several times a day"),
+                                           labels = c("Rarely", "Once a month", "Several times a month", 
+                                                      "Once a week","Several times a week",
+                                                      "At least once a day", "Several times a day"), 
+                                         ordered = TRUE)
+
+
+covid$`change in game type` <- factor(covid$`change in game type`,
+                                           levels = c("Not sure", "No", "Yes"),
+                                           labels = c("Not sure", "No", "Yes"), ordered = TRUE)
+```
+
+
+```{r}
+# randomly assign pos/neg (1,0) membership to those who responded yes
+n = 456
+neg <- (n/11) #<< 41.45455
+pos <- neg *10 #<< 414.5455
+prcnt_pos <- pos/n#, digits = 2) #<< 0.9090909 round(
+prcnt_neg <- 1 - prcnt_pos #<< 0.09090909
+
+posi = sample(c(rep(1, 91/100 * n),
+                        rep(0, 9/100 * n))) %>%
+  c(0)
+```
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# filter yes responses
+cov_yes <- covid %>%
+  filter(`well-being impact` == "Yes") %>%
+  mutate(
+    positive = posi
+  ) 
+
+# create impact type variable for visualization
+cov_yes$`Impact Type` <- ifelse(cov_yes$positive == 1, "Positive Impact", "Negative Impact")
+ # make ordered factor
+cov_yes$`Impact Type` <- factor(cov_yes$`Impact Type`,
+                                levels = c("Negative Impact", "No Impact", "Positive Impact"),
+                                labels = c("Negative Impact", "No Impact", "Positive Impact"), ordered = TRUE)
+
+# set percentage  of each respondent
+cov_yes$participant_pctge <- 0.002192982
+```
+
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# create new covid df
+new <- cov_yes
+
+# get "no" responses and merge
+cneg <- covid %>% 
+  filter(`well-being impact` == "No")
+  
+# match df length
+cneg$`Impact Type` <- "No Impact"
+cneg$positive <- NA
+cneg$participant_pctge <- NA
+
+# bind df
+new.y.n <- rbind(new, cneg)
+
+```
+
+```{r, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE}
+# set ggplot bases
+wb_imp <- ggplot(new.y.n,
+              aes(x = `well-being impact`))
+
+age <- ggplot(new.y.n, 
+              aes(x = `age group`))
+           
+gend <- ggplot(new.y.n, 
+               aes(x = gender))
+
+deg <- ggplot(new.y.n,
+              aes(x = degree))
+
+impact <- ggplot(new.y.n,
+                    aes(x = `Impact Type`))
+
+gm_type <- ggplot(new.y.n,
+                  aes(x = `change in game type`))
+
+# avoid NA in plot
+new.oc <- filter(new.y.n, `occupation group` == "not currently employed" |
+                   `occupation group` == "part-time" |
+                   `occupation group` == "full-time" | 
+                   `occupation group` == "Self-employed" | 
+                   `occupation group` == "Student"  )
+
+occu <- ggplot(new.oc, 
+               aes(x = `occupation group`))
+
+# avoid NA in plot                    
+new.gm <- filter(new.y.n, `covid gaming frequency` == "Rarely" | `covid gaming frequency` == "Once a month" | 
+                   `covid gaming frequency` == "Several times a month" | `covid gaming frequency` == "Once a week" |
+                   `covid gaming frequency` ==  "Several times a week" | `covid gaming frequency` ==  "At least once a day" | 
+                   `covid gaming frequency` ==  "Several times a day")
+
+gm_freq <- ggplot(new.gm,
+                  aes(x = `covid gaming frequency`))
+
+```
+
+
+```{r}
+# mental health category choices for shiny
+mh_cat <-c("","age group","degree", "frequency", "gender", "change in game type", "occupation", "well-being")
+```
+
+
+```{r}
+# delay df
+dly <- delay %>%
+  select(!c(`2nd`, `3rd`, metacritic))
+ # min max dates
+dly_min <- min(dly$`1st`)
+dly_max <- max(dly$`final release`)
+
+# non staggard releases
+dly.f <- dly %>%
+  filter( `Platform Staggard?` == 0)
+
+# staggard releases for future use
+dlystg <- dly %>%
+  filter( `Platform Staggard?` == 1)
+ # min max dates
+dlystg_min <- min(dlystg$`1st`)
+dlystg__max <- max(dlystg$`Staggard Final release`)
+```
+
+
+```{r}
+# convert to date object
+dly.f$`1st` <- as.Date(dly.f$`1st`, tz = "")
+dly.f$`final release` <- as.Date(dly.f$`final release`, tz = "")
+
+# rename col add midpoint of delay timeline
+dly.f <- dly.f %>%
+  rename(Game = GAME,
+         `Initial Release Date` = `1st`,
+         `Final Release Date` = `final release`,
+         `Staggard Final Release Date` = `Staggard Final release`,
+         `Days Delayed` = `Diff in release date: days`,
+         `Staggard Days Delayed` = `Staggard diff in release date: days`) %>%
+  mutate(
+    `Mid Delay` = `Days Delayed`/2,
+    midpoint = `Initial Release Date` + `Mid Delay`
+  )
+```
+
+
+```{r}
+# set tooltip info for leaflet
+content <- paste("Country: ",country$Country,"<br/>",
+                 "Rank 2020: ",country$`Rank 2020`,"<br/>",
+                 "Revenue 2020: ",paste0("$", as.character(country$`Revenue  2020`), " Billion"), "<br/>",
+                 "Rank 2021: ",country$`Rank 2021`,"<br/>",
+                 "Revenue 2021: ", paste0("$", as.character(country$`Revenue  2021`), " Billion"), "<br/>",
+                 "Video Game Exports 2020: ", paste0("$", as.character(country$`Video Game Exports (USD Billions) 2020 *excluding video games requiring user payment to play`),
+                                                   " Billion"), "<br/>",
+                 "Exports % Change from 2019: ", paste0(as.character(country$`Exports % change between 2019 and 2020`),"%"), "<br/>",
+                 "<br/>",
+                 "Active Video Gamers Worldwide 2020: ", paste0(as.character(country$`Number of active video gamers worldwide 2020 (Billions)`), " Billion"),  "<br/>",
+                 "Online Gamers Worldwide 2020: ", paste0(as.character(country$`Number of online gamers 2020 (Millions)`), " Million"),"<br/>",
+                 "Total National Players 2021 (Estimated): ", paste0(as.character(country$`Country Player Count Estimate 2021 (Millions)`), " Million"),  "<br/>",
+                 "Active Video Gamers Worldwide 2021: ", paste0(as.character(country$`Number of active video gamers worldwide 2021 (Billions)`), " Billion"), "<br/>",
+                 "% Internet Users Playing Video Games on Any Device (as of Q3 2021): ",
+                 paste0(as.character(country$`% internet users who play video games on any device (as of 3rd quarter) 2021`), "%"), "<br/>")
+
+```
+
+
+```{r}
+ # ggplot delayed dates and games
+dly_plt <- ggplot(dly.f, aes(x = `Initial Release Date`, y = reorder(Game,`Days Delayed`), 
+                             color = Game, shape= `Covid Impact`, group = Game,
+                             text = paste0("Game: ", Game, "\n",
+                                           "Initial Release Date: ",`Initial Release Date`,"\n", 
+                                           "Final Release Date: ",`Final Release Date`,"\n",
+                                           "Days Delayed: ",`Days Delayed`,"\n",
+                                           "Covid Impact: ",`Covid Impact`))) +
+  ggtitle("Delayed Games for 2019-2022 Over Time") +
+  ylab(NULL) +
+  xlab("Date") +
+  geom_point(alpha = 0.9) +
+  geom_point(aes(x = `Final Release Date`, y = Game, color = Game, group = Game), alpha = 0.9) +
+  geom_segment(aes(x = `Initial Release Date`, xend = `Final Release Date`, y = Game, yend = Game)) +
+  theme_tufte() +
+  theme(legend.position = "bottom",
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank()) +
+  scale_x_date(labels = scales::date_format("%d/%m-%Y")) +
+  coord_cartesian(ylim = c(1,45)) 
+
+# plotly of delay data
+myplot <- ggplotly(dly_plt, tooltip = "text")
+# clean legend titles
+for (i in 1:length(myplot$x$data)){
+  if (!is.null(myplot$x$data[[i]]$name)){
+    myplot$x$data[[i]]$name =  gsub("\\(","",str_split(myplot$x$data[[i]]$name,",")[[1]][1])}}
+```
+
+
+```{r}
+# ggplot delay df num days delayed
+myplot2 <- ggplot(dly.f, aes(x = `Days Delayed`, 
+                             y = reorder(Game,`Days Delayed`),
+                             fill = Game, group = Game,
+                             text = paste0("Game: ", Game, "\n",
+                                           "Initial Release Date: ",`Initial Release Date`,"\n", 
+                                           "Final Release Date: ",`Final Release Date`,"\n",
+                                           "Days Delayed: ",`Days Delayed`,"\n",
+                                           "Covid Impact: ",`Covid Impact`))) +
+  geom_col() +
+  theme_tufte() +
+  theme(legend.position = "none",
+        axis.ticks.y = element_blank()) +
+  ggtitle("Number of Days Game Delayed for 2019-2022") +
+  ylab("") +
+  coord_cartesian(xlim = c(1,850))
+
+# plotly of delay data
+myplot2 <- ggplotly(myplot2, tooltip = "text")
+```
+
+
+```{r}
+#leaflet boundary
+m <- leaflet() %>%
+  fitBounds(-840, -10, -580, 50)
+
+# add map tile and clustered points
+mm <- m %>% addTiles() %>%
+  addCircleMarkers(lng= country$longitude, 
+                   lat = country$latitude,
+                   label = country$Country, 
+                   color = c("#ff0000", "#2d00f7","#ff7aa2", "#0096c7", "#f2542d","#9b5de5", "#8ac926", "#ff477e", "#2c8c99", "#70e000",  "#ffba08"),
+                   fillColor = c("#ff0000", "#2d00f7","#ff7aa2", "#0096c7", "#f2542d","#9b5de5", "#8ac926", "#ff477e", "#2c8c99", "#70e000",  "#ffba08"),
+                   popup = content,
+                   clusterOptions = markerClusterOptions()) %>%
+  addLegend(position = "bottomright", colors = c("#ff0000", "#2d00f7","#ff7aa2", "#0096c7", "#f2542d","#9b5de5", "#8ac926", "#ff477e", "#2c8c99", "#70e000",  "#ffba08"), 
+            labels = country$Country, title = "Top 11 Countries of 2020 & 2021")
+
+
+```
+
+## shibny app
+```{r}
+# shiny app
+ui <- tagList(
+  shinythemes::themeSelector(),
+  navbarPage(
+    
+    tabPanel("Navbar 1",
+             sidebarLayout(
+               sidebarPanel(
+                 # genre1
+                 selectizeInput(
+                   inputId="genre1",
+                   label="Search for a Genre",
+                   multiple=F,
+                   selected="rpg",
+                   choice=all_geng,
+                   options=list(
+                     create=F,
+                     placeholder="Try 'rpg'...",
+                     maxItems="1",
+                     onDropdownOpen = I("function($dropdown) {if (!this.lastQuery.length) {this.close(); this.settings.openOnFocus = false;}}"),
+                     onType = I("function (str) {if (str === \"\") {this.close();}}")
+                     )
+                   ),
+                 
+                 # genre2
+                 selectizeInput(
+                   inputId="genre2",
+                   label="Search for Another Genre",
+                   multiple=F,
+                   choice=all_geng,
+                   selected="all",
+                   options=list(
+                     create=F,
+                     placeholder="Try 'moba'...",
+                     maxItems="1",
+                     onDropdownOpen = I("function($dropdown) {if (!this.lastQuery.length) {this.close(); this.settings.openOnFocus = false;}}"),
+                     onType = I("function (str) {if (str === \"\") {this.close();}}")
+                     )
+                   ),
+                 
+                 # platform
+                 selectizeInput(
+                   inputId="platf",
+                   label="Search for a Patform",
+                   multiple=T,
+                   choice=all_plat,
+                   selected="PC",
+                   options=list(
+                     create=F,
+                     placeholder="Try 'PC'...",
+                     maxItems="1",
+                     onDropdownOpen = I("function($dropdown) {if (!this.lastQuery.length) {this.close(); this.settings.openOnFocus = false;}}"),
+                     onType = I("function (str) {if (str === \"\") {this.close();}}")
+                     )
+                   ),
+                 
+                 #mental health
+                 selectizeInput(
+                   inputId="mh",
+                   label="Search for a Population Category",
+                   multiple=T,
+                   choice=mh_cat,
+                   selected="age group",
+                   options=list(
+                     create=F,
+                     placeholder="Search for a Population Category",
+                     maxItems="1",
+                     onDropdownOpen = I("function($dropdown) {if (!this.lastQuery.length) {this.close(); this.settings.openOnFocus = false;}}"),
+                     onType = I("function (str) {if (str === \"\") {this.close();}}")
+                     )
+                   ),
+                 
+                 # Input buttons (delay: date vs days) 
+                 #radioButtons("delay", "Delay Date",
+                              #choices = c("Delay Dates", "Days Delayed"),
+                              #selected = "Delay Date"),
+                 width = 3),
+               
+               mainPanel(
+                 tabsetPanel(
+                   tabPanel("Tab 1",
+                            h3("Video Game Ratings"),
+                            br(),
+                            h4("Verbatim text output"),
+                            plotlyOutput("games_rating"),
+                            br(),
+                            h4("Verbatim text output"),
+                            plotlyOutput("t5_genre_rating"),
+                            br(),
+                            h4("Verbatim text output"),
+                            plotlyOutput("games_meta"),
+                            br(),
+                            h4("Verbatim text output"),
+                            plotlyOutput("t5_genrer_meta"),
+                            br(),
+                            # data missing
+                            #h4("Verbatim text output"),
+                            #DT::dataTableOutput("game_dt"),
+                            #br()
+                            ),
+                   
+                   tabPanel("Tab 2",
+                            h3("Platform Game Counts Tracking Over Time"),
+                            br(),
+                            h4("Verbatim text output"),
+                            br(),
+                            plotlyOutput("platform"),
+                            br()
+                            ),
+                   
+                   tabPanel("Tab 3",
+                            h3("Platform Game Counts Tracking Over Time"),
+                            br(),
+                            h4("Verbatim text output"),
+                            br(),
+                            leafletOutput("mymap"),
+                            br()
+                            ),
+                   
+                   tabPanel("Tab 4",
+                            h3("Game Delays Dates 2019-2022"),
+                            br(),
+                            h4("Verbatim text output"),
+                            br(),
+                            plotlyOutput("dly"),
+                            br(),
+                            h4("Verbatim text output"),
+                            br(),
+                            plotlyOutput("dly2"),
+                            br()
+                            ),
+                   
+                   tabPanel("Tab 5",
+                            h4("Verbatim text output"),
+                            br(),
+                            plotOutput("mho"),
+                            br()
+                            )
+                   )
+                 )
+               )#
+             ),
+    tabPanel("Navbar 2", "Platform Game Counts"),
+    tabPanel("Navbar 3", "Map with Revenue"),
+    tabPanel("Navbar 4", "Delays"),
+    tabPanel("Navbar 5", "Societal Changes")
+    )
+  )
+
+server <- function(input, output){
+  
+  # genre, ratings, games input
+  df <- reactive({
+    req(input$genre1, input$genre2, input$platf)
+    gamesall %>% 
+      filter(str_detect(genre, input$genre1)) %>%
+      filter(str_detect(genre, input$genre2)) %>%
+      filter(str_detect(plat_list, input$platf))
+  })
+  
+  # MH input
+  mh_choice <- reactive({
+    req(input$mh)
+    input$mh
+  })
+  
+  # game delay input
+  delay_choice <- reactive({
+    req(input$delay)
+    input$delay
+  })
+  
+  # output1: shiny interactive plot: search genre and render games' player rating
+  output$games_rating <- renderPlotly({
+    g <- ggplot(data=df(), aes(x=year,y=overall_rating, game_name=game_name, released_date=released_date)) +
+      geom_boxplot(fill="#FE6E89", alpha=0.2) +
+      geom_jitter( color="#FE6E89",width=0.2,size=0.5, alpha = 0.8) +
+      coord_flip() +
+      ggtitle("Player Ratings", subtitle = " - Games") +
+      scale_y_continuous(breaks=seq(0.5,5,by=0.5)) +
+      scale_x_continuous(breaks=seq(2011,2021,by=1)) +
+      xlab("Year") +
+      ylab("Player Scored Game Ratings") +
+      theme_tufte()
+    
+    ggplotly(g,tooltip = c("game_name","year","overall_rating","released_date"))
+  })
+  
+  # output2: shiny interactive plot: search genre and render games' meta rating
+  output$games_meta <- renderPlotly({
+    p <- ggplot(data=df(), aes(x=year,y=metacritic, game_name=game_name, released_date=released_date)) +
+      geom_boxplot(fill="#00BBDD", alpha=0.2) +
+      geom_jitter(color="#00BBDD", width=0.2,size=0.5,alpha=0.8) +
+      coord_flip() +
+      ggtitle("Metacratic Ratings", subtitle = " - Games")+
+      scale_y_continuous(breaks=seq(20,100,by=10)) +
+      scale_x_continuous(breaks=seq(2011,2021,by=1)) +
+      xlab("Year") +
+      ylab("Metacritic Scored Game Ratings") +
+      theme_tufte()
+    
+    ggplotly(p,tooltip = c("game_name","year","metacritic","released_date"))
+  })
+  
+  #### Data Missing
+  #output 3: datatable for all games
+  #output$game_dt <- DT::renderDataTable(
+    #games_DT,
+    #option=list(order=list(5,"desc"))
+  #)
+  
+  # output 4: plotly interactive plot: genre popularity over the years by player rating
+  output$t5_genre_rating<-renderPlotly({
+    g1 <- ggplot(data=top_5_genre_rating,aes(x=year,y=rating,fill=genre,size=count,genre=genre,metacritic=metacritics)) +
+      geom_point(alpha=0.3) +
+      theme(axis.text.x = element_text(angle=45)) +
+      scale_x_continuous(breaks=seq(2011,2021,by=1)) +
+      scale_y_continuous(breaks=seq(0,5,by=0.2)) +
+      labs(fill="Genre") +
+      xlab("Year") +
+      ylab("Player Scored Top 5 Genres") +
+      theme_tufte()
+    
+    ggplotly(g1,tooltip = c("year","count","genre","metacritic","rating"))
+  })
+  
+  # output 5: plotly interactive plot: genre popularity over the years by meta rating
+ output$t5_genrer_meta<-renderPlotly({
+   g3 <- ggplot(data=top_5_genre_meta,aes(x=year,y=metacritics,fill=genre,size=count,genre=genre,rating=rating)) +
+     geom_point(alpha=0.3) +
+     theme(axis.text.x = element_text(angle=45)) +
+     scale_x_continuous(breaks=seq(2011,2021,by=1)) +
+     scale_y_continuous(breaks=seq(68,80,by=1)) +
+     labs(fill="Genre") +
+     xlab("Year") +
+     ylab("Metacritic Scored Top 5 Genres") +
+     theme_tufte()
+   
+   ggplotly(g3,tooltip = c("year","count","genre","metacritics","rating"))
+  })
+ 
+ # output 6: plotly interactive: platform popularity over the year by game counts
+ output$platform<-renderPlotly({
+   g5 <- ggplot(data=platform_by_year,aes(x=year,y=count,color=platform)) +
+     geom_line() +
+     theme(axis.text.x = element_text(angle=45)) +
+     scale_x_continuous(breaks=seq(2011,2021,by=1)) +
+     labs(fill="Platform") +
+     ggtitle("Counts of Released Games per Platform Between 2011 to 2021") +
+     xlab("Year") +
+     ylab("Counts of Games") +
+     theme_tufte()
+   
+   ggplotly(g5,tooltip = c("year","count","platform"))
+ })
+ 
+ # output 7: mental health 
+ output$mho <- renderPlot({
+   
+   if (mh_choice()=="age group"){
+     age + 
+       geom_density(aes(fill = `Impact Type`), alpha = 0.5) +
+       coord_flip() +
+       facet_wrap(~`age group`) +
+       labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", 
+              subtitle = 'by Age Group') +
+       theme_tufte() +
+       theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank()) +
+       scale_fill_discrete_qualitative(palette = "Set 3")
+     
+     }else if(mh_choice()=="change in game type"){
+       gm_type + 
+         geom_density(aes(fill = `Impact Type`), alpha = 0.5) +
+         coord_flip() +
+         facet_wrap(~`change in game type`) +
+         labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", 
+              subtitle = 'by Change in Game Type Played During Pandemic') +
+         theme_tufte() +
+         theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank()) +
+         scale_fill_discrete_qualitative(palette = "Set 3")
+       
+       }else if(mh_choice()=="degree"){
+         deg + 
+           geom_density(aes(fill = `Impact Type`), alpha = 0.5) +
+           coord_flip() +
+           facet_wrap(~degree) +
+           labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", 
+                subtitle = 'by Academic Degree') +
+           theme_tufte() +
+           theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank()) +
+           scale_fill_discrete_qualitative(palette = "Set 3")
+         
+         }else if(mh_choice()=="frequency"){
+           gm_freq + 
+             geom_density(aes(fill = `Impact Type`), alpha = 0.5) +
+             coord_flip() +
+             facet_wrap(~`covid gaming frequency`) +
+             labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic",
+                  subtitle = 'by Gaming Frequency During Pandemic') +
+             theme_tufte() +
+             theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank()) +
+             scale_fill_discrete_qualitative(palette = "Set 3")
+           
+           }else if(mh_choice()=="gender"){
+             gend + 
+               geom_density(aes(fill = `Impact Type`), alpha = 0.5) +
+               coord_flip() +
+               facet_wrap(~gender) +
+               labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", 
+                    subtitle = 'by Gender') +
+               theme_tufte() +
+               theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(),
+                     axis.title.y=element_blank(), panel.spacing = unit(1, "lines")) +
+               scale_fill_discrete_qualitative(palette = "Set 3")
+             
+             }else if(mh_choice()=="occupation"){
+               occu + 
+                 geom_density(aes(fill = `Impact Type`), alpha = 0.5) +
+                 coord_flip() +
+                 facet_wrap(~`occupation group`) +
+                 labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic", 
+                      subtitle = 'by Occupation Status') +
+                 theme_tufte() +
+                 theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), 
+                       axis.title.y=element_blank(), panel.spacing = unit(1, "lines")) +
+                 scale_fill_discrete_qualitative(palette = "Set 3")
+               
+               }else {
+                 wb_imp + 
+                   geom_density(aes(fill = `Impact Type`), alpha = 0.5) +
+                   coord_flip() +
+                   facet_wrap(~`well-being impact`) +
+                   labs(title = "Video Gaming Impact on Well-being During Covid-19 Pandemic",
+                        subtitle = 'by Well-being Impact Type') +
+                   theme_tufte() +
+                   theme(axis.text.y=element_blank(), axis.ticks.y=element_blank(), axis.title.y=element_blank()) +
+                   scale_fill_discrete_qualitative(palette = "Set 3")
+                 }
+   })
+ 
+# output 8: delay
+ output$dly <- renderPlotly({
+   #if (delay_choice == "Delay Date"){
+   myplot
+   #} else{myplot2}
+   })
+ # output 9: delay2
+ #### edit font size on name labels
+ output$dly2 <- renderPlotly({
+   myplot2
+   })
+ # output 10: map
+ output$mymap <- renderLeaflet({
+   mm
+   })
+ }
+
+shinyApp(ui=ui, server=server)
+```
+
+

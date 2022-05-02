@@ -1,0 +1,76 @@
+---
+title: "data viz project wordcloud"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+
+data_2019<-read_csv('twitter data/2019_tweets_clean.csv')
+data_2020<-read_csv('twitter data/2020_tweets_clean.csv')
+data_2021<-read_csv('twitter data/2021_cleaned_tweets.csv')
+head(data_2021)
+```
+
+```{r}
+library(tm)
+#Create a vector containing only the text
+text_2019 <- data_2019$sw_removed
+text_2020 <- data_2020$sw_removed
+text_2021 <- data_2021$sw_removed
+# Create a corpus
+docs2019 <- Corpus(VectorSource(text_2019))
+docs1 <- Corpus(VectorSource(text_2020))
+docs2 <- Corpus(VectorSource(text_2021))
+
+```
+
+```{r}
+#Document Matrix
+dtm1 <- TermDocumentMatrix(docs1) 
+matrix1 <- as.matrix(dtm1) 
+words1 <- sort(rowSums(matrix1),decreasing=TRUE) 
+df_2020 <- data.frame(word = names(words1),freq=words1)
+
+dtm2 <- TermDocumentMatrix(docs2) 
+matrix2 <- as.matrix(dtm2) 
+words2 <- sort(rowSums(matrix2),decreasing=TRUE) 
+df_2021 <- data.frame(word = names(words2),freq=words2)
+
+dtm3 <- TermDocumentMatrix(docs2019) 
+matrix3 <- as.matrix(dtm3) 
+words3 <- sort(rowSums(matrix3),decreasing=TRUE) 
+df_2019 <- data.frame(word = names(words3),freq=words3)
+```
+
+
+```{r}
+library(wordcloud)
+library(RColorBrewer)
+library(wordcloud2)
+
+#2019
+set.seed(1234) # for reproducibility 
+wordcloud(words = df_2019$word, freq = df_2019$freq, min.freq = 1, max.words=200, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Accent"))
+```
+
+```{r}
+#2020
+set.seed(1234) 
+wordcloud(words = df_2020$word, freq = df_2020$freq, min.freq = 1, max.words=200, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+
+```
+
+```{r}
+#2021
+set.seed(1234)
+wordcloud(words = df_2021$word, freq = df_2021$freq, min.freq = 1, max.words=200, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2")) 
+
+```
+
+

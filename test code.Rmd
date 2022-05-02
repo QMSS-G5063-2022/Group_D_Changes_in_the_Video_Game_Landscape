@@ -24,6 +24,9 @@ sales$Date <- as.Date(with(sales, paste(Year,Month,Day, sep="-")),"%Y-%m-%d")
 #line graph 
 
 ggplot(sales, aes(x = Date, y = Sold, color = Hardware)) + geom_line()
+
+#slider for dates 
+#make colors 
 ```
 
 ```{r}
