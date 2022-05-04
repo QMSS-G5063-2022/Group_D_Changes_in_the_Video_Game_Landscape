@@ -211,10 +211,10 @@ shinyUI(
           br(),
           h3("Introduction:"),
           h4(
-            "The first electronic game, now referred to as video game, ever released was Tennis for Two introduced on October 18th, 1958. 
+            "The first electronic game, now referred to as video game, ever released was Tennis for Two introduced on October 18th, 1958.
             In a short 64 years this one game sparked the creation of a multi-billion dollar industry.
             With this new gaming industry came a plethora of innovations including new genres, advancements in software and hardware capabilities,
-            and numerous sub-culture's to name a few. For our project, we will examine the video game landscape and how it has changed over time, 
+            and numerous sub-culture's to name a few. For our project, we will examine the video game landscape and how it has changed over time,
             particularly with an eye on the past 4 years or so. We will take a deep-dive into the industry by looking at the evolution of perceptions of games,
             popular platforms, country-specific industries, and finally changes in the industry and public sentiment since the beginning of the COVID-19 pandemic. "
           ),
@@ -260,9 +260,13 @@ shinyUI(
           br(),
           # Tazz
           h4("Tazz Orchi"),
-          p("Tazz grew up playing whatever free game was installed on her PC until her parents finally bought her a Gameboy Advance SP."),
-          p("She spent her younger years playing exclusively Gameboy games until finding a love for PC gaming. 
-            She has since built her first PC and enjoys multiplayer games with her friends the most. "),
+          p(
+            "Tazz grew up playing whatever free game was installed on her PC until her parents finally bought her a Gameboy Advance SP."
+          ),
+          p(
+            "She spent her younger years playing exclusively Gameboy games until finding a love for PC gaming.
+            She has since built her first PC and enjoys multiplayer games with her friends the most. "
+          ),
           h5("Current Favorite Games:"),
           tags$div(list(
             h5("Monster Hunter World"),
@@ -335,7 +339,9 @@ shinyUI(
               br(),
               br()
             ))
-          ),value = 0),
+          ),
+          value = 0
+        ),
         
         # tab 1
         # Video Games and Genres Ratings tab
@@ -360,6 +366,23 @@ shinyUI(
             h5("  2. comparing the most popular genres over the years.")#,
             #h5("The following data is extracted through RAWG API: https://rawg.io/apidocs#pricing")
           )),
+          br(),
+          h3("Video Game Ratings by Players (out of 5)"),
+          br(),
+          plotlyOutput("games_rating", height = 550),
+          h3("Video Game Ratings by Metacritic (out of 100)"),
+          br(),
+          plotlyOutput("games_meta", height = 550),
+          tags$hr(),
+          br(),
+          
+          h3("Top 5 Genres Rated by Players"),
+          br(),
+          plotlyOutput("t5_genre_rating", height = 550),
+          h3("Top 5 Genres Rated by Metacritics"),
+          br(),
+          plotlyOutput("t5_genrer_meta", height = 550),
+          br(),
           p(
             "The score for genre is calculated by grouping games by their lable and taking the average of the groups.
            Every genre that has less than 30 games is dropped. The bubble size displays the number of games."
@@ -379,22 +402,6 @@ shinyUI(
            Games like Red Dead Redemption 2 and Seikiro: Shadows Die Twice receive overwhelmingly positive reviews by both
            players and the critics alike."
           ),
-          br(),
-          h3("Video Game Ratings by Players (out of 5)"),
-          br(),
-          plotlyOutput("games_rating", height = 550),
-          h3("Video Game Ratings by Metacritic (out of 100)"),
-          br(),
-          plotlyOutput("games_meta", height = 550),
-          tags$hr(),
-          br(),
-          
-          h3("Top 5 Genres Rated by Players"),
-          br(),
-          plotlyOutput("t5_genre_rating", height = 550),
-          h3("Top 5 Genres Rated by Metacritics"),
-          br(),
-          plotlyOutput("t5_genrer_meta", height = 550),
           tags$hr(),
           br(),
           
@@ -406,21 +413,22 @@ shinyUI(
           DT::dataTableOutput("gamesdt", height = 650),
           value = 1
         ),
-        
         # Game Counts by Platforms tab
         tabPanel(
           "Games and Platforms",
           br(),
           h3("Platform Game Counts Tracking Over Time"),
           br(),
-          p("The first ever home video game console was released in 1972 by Magnavox, just 14 years after the release of the first video game.
-            Since then game companies have released numerous platforms on which consumers can play. 
+          p(
+            "The first ever home video game console was released in 1972 by Magnavox, just 14 years after the release of the first video game.
+            Since then game companies have released numerous platforms on which consumers can play.
             There are traditional consoles, which are heavily dominated by Microsoft's XBox Series and Sony's PS consoles,
-            as well as handheld devices like the ever popular Nintendo Switch."),
+            as well as handheld devices like the ever popular Nintendo Switch."
+          ),
           p(
             "The graph below shows the most popular platforms for game releases over the last decade.
             Following a dip in 2019, the most popular release platforms were PC, Sony PS Consoles, and Xbox series consoles.
-            By hovering over an individual point you can see the number of games released on the associated platform. 
+            By hovering over an individual point you can see the number of games released on the associated platform.
             In the last 10 years, the most games ever released on one platform was in 2015 when 441 games were released for PC in one year."
           ),
           br(),
