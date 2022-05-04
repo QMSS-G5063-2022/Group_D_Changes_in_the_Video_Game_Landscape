@@ -1,4 +1,4 @@
-# Group_D_the_game_industry
+# Group_D_Changes_in_the_Video_Game_Landscape
 
 Hey! This is group d, and we are interested in visualizing something about the gaming indutry. The team members include:
 
