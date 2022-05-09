@@ -6,3 +6,5 @@ Hey! This is group D, and we are interested in visualizing Changes in the Video 
 · Tazz Orchi tzo2002
 · Xiuyuan Shen xs2441
 · Adrian Varallyay av2734
+
+[Please find the link to Group D's video presentation here](https://drive.google.com/file/d/1s-fpJjUjofRTzyvWcwVMTHTk3DcMkZZr/view?usp=sharing)
