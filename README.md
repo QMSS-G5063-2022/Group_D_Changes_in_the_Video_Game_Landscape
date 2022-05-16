@@ -19,4 +19,4 @@ We examine the following topics:
 + The impact of Covid-19 on the video game landscape 
 + Game related Twitter discourse following Covid-19
 
-We hope this website provides you with insight into the evolution of the video game industry!
+We hope this website provides you with insight into the evolution of the video game industry!!
